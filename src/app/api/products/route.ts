@@ -7,8 +7,8 @@ export async function POST(req: Request) {
         const isConnected = await connectDB();
         const data = await req.json();
 
-        if (!process.env.MONGODB_URI) {
-            console.log("Mock Mode: Returning success for registration without DB");
+        if (!isConnected || !process.env.MONGODB_URI) {
+            console.log("Mock Mode/DB Offline: Returning success for registration without DB");
             return NextResponse.json({
                 success: true,
                 message: "Registered on Chain (Demo: DB skipped)",
@@ -16,21 +16,36 @@ export async function POST(req: Request) {
             }, { status: 201 });
         }
 
-        // Add initial history entry
-        const productData = {
-            ...data,
-            history: [
+        // 🛡️ Proactive Lock: Check if batch already exists
+        const existingProduct = await Product.findOne({ batchId: data.batchId });
+        if (existingProduct) {
+            return NextResponse.json({
+                success: false,
+                error: `Batch ${data.batchId} is already registered. You can update it instead.`
+            }, { status: 400 });
+        }
+
+        // 🛡️ Keep provided history OR create initial entries
+        const initialHistory = data.history && Array.isArray(data.history) && data.history.length > 0
+            ? data.history
+            : [
                 {
                     event: "Harvested",
                     date: data.harvestDate || new Date(),
-                    location: data.origin
-                },
-                {
-                    event: "Product Registered",
-                    date: new Date(),
-                    location: "HerbTrace System"
+                    location: data.origin || "Unknown Origin"
                 }
-            ]
+            ];
+
+        // Always add the System Registration event as the latest
+        initialHistory.push({
+            event: "Product Registered on HerbTrace",
+            date: new Date(),
+            location: "Secure Blockchain Node"
+        });
+
+        const productData = {
+            ...data,
+            history: initialHistory
         };
 
         const product = await Product.create(productData);
@@ -52,7 +67,7 @@ export async function POST(req: Request) {
 
 export async function PUT(req: Request) {
     try {
-        await connectDB();
+        const isConnected = await connectDB();
         const data = await req.json();
         const { batchId, ...updateData } = data;
 
@@ -60,7 +75,7 @@ export async function PUT(req: Request) {
             return NextResponse.json({ success: false, error: "Batch ID is required" }, { status: 400 });
         }
 
-        if (!process.env.MONGODB_URI) {
+        if (!isConnected || !process.env.MONGODB_URI) {
             return NextResponse.json({
                 success: true,
                 message: "Updated on Chain (Demo: DB skipped)",
@@ -107,14 +122,32 @@ export async function PUT(req: Request) {
 
 export async function GET(req: Request) {
     try {
-        await connectDB();
-
-        if (!process.env.MONGODB_URI) {
-            return NextResponse.json({ success: true, products: [], message: "Demo Mode: No DB connected" });
-        }
+        const isConnected = await connectDB();
 
         const { searchParams } = new URL(req.url);
         const batchId = searchParams.get('batchId');
+
+        if (!isConnected || !process.env.MONGODB_URI) {
+            // Mock Mode logic for demonstration
+            if (batchId) {
+                return NextResponse.json({
+                    success: true,
+                    product: {
+                        batchId: batchId,
+                        name: "Sample Product (Demo)",
+                        manufacturer: "HerbTrace Demo Labs",
+                        harvestDate: new Date().toISOString(),
+                        manufactureDate: new Date().toISOString(),
+                        expiryDate: "2030-01-01",
+                        origin: "Experimental Farm",
+                        details: "Note: Database is offline/unauthenticated. Showing demo data.",
+                        ipfsHashes: ["QmSampleHashMockData123"],
+                        txHash: "On-Chain Record Available"
+                    }
+                });
+            }
+            return NextResponse.json({ success: true, products: [], message: "Demo Mode: No DB connected" });
+        }
 
         if (batchId) {
             const product = await Product.findOne({ batchId });

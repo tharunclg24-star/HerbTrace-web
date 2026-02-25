@@ -2,12 +2,12 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Plus, LayoutDashboard, FileText, Settings, LogOut, Package, ClipboardList, TrendingUp, Upload, CheckCircle2, QrCode as QrIcon, Download, Loader2, Mail, Link2, Link2Off, ExternalLink } from "lucide-react";
+import { Plus, LayoutDashboard, FileText, Settings, LogOut, Package, ClipboardList, TrendingUp, Upload, CheckCircle2, QrCode as QrIcon, Download, Loader2, Mail, Link2, Link2Off, ExternalLink, Calendar, MapPin } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { QRCodeSVG } from "qrcode.react";
 import { uploadToIPFS } from "@/lib/ipfs";
 import { registerBatchOnChain, updateBatchOnChain, connectWallet, verifyNetwork } from "@/lib/web3";
-import { getActiveNetwork } from "@/config/network.config";
+import { getActiveNetwork, getContractAddress } from "@/config/network.config";
 
 export default function Dashboard() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -29,8 +29,48 @@ export default function Dashboard() {
     const interval = setInterval(() => {
       verifyNetwork().then(setNodeStatus);
     }, 10000); // Check every 10s
+
+    // Listen for MetaMask network changes to auto-reload
+    if (typeof window !== "undefined" && (window as any).ethereum) {
+      (window as any).ethereum.on('chainChanged', () => window.location.reload());
+    }
+
     return () => clearInterval(interval);
   }, []);
+
+  const switchNetwork = async () => {
+    const config = getActiveNetwork();
+    if (!window || !(window as any).ethereum) return;
+
+    try {
+      await (window as any).ethereum.request({
+        method: 'wallet_switchEthereumChain',
+        params: [{ chainId: config.chainIdHex }],
+      });
+    } catch (error: any) {
+      // This error code indicates that the chain has not been added to MetaMask.
+      if (error.code === 4902) {
+        try {
+          await (window as any).ethereum.request({
+            method: 'wallet_addEthereumChain',
+            params: [
+              {
+                chainId: config.chainIdHex,
+                chainName: config.name,
+                rpcUrls: [config.rpcUrl],
+                nativeCurrency: config.nativeCurrency,
+              },
+            ],
+          });
+        } catch (addError) {
+          console.error("Failed to add network", addError);
+        }
+      } else {
+        console.error("Failed to switch network", error);
+        alert(`Could not switch network automatically. Error: ${error.message}`);
+      }
+    }
+  };
 
   useEffect(() => {
     if (isLoggedIn) {
@@ -142,7 +182,9 @@ export default function Dashboard() {
         if (!dbResult.success) throw new Error(dbResult.error);
       } else {
         // Register on Blockchain
-        // Register on Blockchain
+        const contractAddress = getContractAddress();
+        console.log(`🚀 Registering on Blockchain at: ${contractAddress}`);
+
         const blockchainResult = await registerBatchOnChain({
           batchId,
           herbName,
@@ -169,17 +211,40 @@ export default function Dashboard() {
         if (!dbResult.success) throw new Error(dbResult.error);
       }
 
+      // Use the current browser origin for the QR Code to avoid IP mismatches
+      const verifyUrl = `${window.location.origin}/verify?batchId=${batchId}`;
+
       setSuccessData({
         batchId,
         txHash,
-        // Use local IP for QR code so it works on mobile
-        verifyUrl: `http://100.100.7.131:3000/verify?batchId=${batchId}`,
+        verifyUrl,
         isUpdate: !!editingProduct
       });
       fetchProducts(); // Refresh the list
     } catch (error: any) {
       console.error("Operation failed", error);
-      alert("Operation failed: " + error.message);
+
+      // Provide user-friendly error messages
+      let errorMessage = "Operation failed: ";
+
+      if (error.message.includes("Batch already registered") || error.message.includes("require(false)")) {
+        errorMessage = `❌ Batch ID "${(e.target as HTMLFormElement).batchId.value}" already exists on the blockchain!\n\n` +
+          `Please use a different Batch ID or verify the existing batch at:\n` +
+          `${window.location.origin}/verify?batchId=${(e.target as HTMLFormElement).batchId.value}`;
+      } else if (error.message.includes("user rejected") || error.message.includes("User denied")) {
+        errorMessage = "Transaction was cancelled. Please approve the MetaMask transaction to continue.";
+      } else if (error.message.includes("insufficient funds")) {
+        errorMessage = "Insufficient funds in your wallet to complete this transaction.";
+      } else if (error.message.includes("contract not found") || error.message.includes("BAD_DATA")) {
+        errorMessage = "Smart contract not found. Please ensure:\n" +
+          "1. Hardhat node is running\n" +
+          "2. Contract is deployed\n" +
+          "3. Contract address in .env.local is correct";
+      } else {
+        errorMessage += error.message;
+      }
+
+      alert(errorMessage);
     } finally {
       setIsRegistering(false);
     }
@@ -198,7 +263,7 @@ export default function Dashboard() {
             <h1>Manufacturer Login</h1>
             <p>Access your HerbTrace dashboard</p>
           </div>
-          <form onSubmit={handleLogin}>
+          <form onSubmit={handleLogin} autoComplete="off">
             <div className="form-group">
               <label>Email Address</label>
               <div className="input-with-icon">
@@ -208,6 +273,7 @@ export default function Dashboard() {
                   placeholder="manufacturer@example.com"
                   value={loginEmail}
                   onChange={(e) => setLoginEmail(e.target.value)}
+                  autoComplete="off"
                 />
               </div>
             </div>
@@ -328,7 +394,7 @@ export default function Dashboard() {
           {nodeStatus && (
             <div className={`node-status ${nodeStatus.success ? 'online' : 'offline'}`}>
               {nodeStatus.success ? <Link2 size={14} /> : <Link2Off size={14} />}
-              <span>Node: {nodeStatus.success ? `Online (${nodeStatus.chainId})` : 'Offline (8545)'}</span>
+              <span>Node: {nodeStatus.success ? `Online (${nodeStatus.chainId})` : 'Offline (31337)'}</span>
             </div>
           )}
           {wallet ? (
@@ -348,8 +414,8 @@ export default function Dashboard() {
       <main className="dashboard-main">
         <header className="dashboard-header">
           <div>
-            <h1>{activeTab === "overview" ? "Dashboard Overview" : "My Products"}</h1>
-            <p className="text-muted">Welcome back, {loginEmail.split('@')[0]}</p>
+            <h1 className="text-gradient">Manufacturer Hub</h1>
+            <p className="text-muted">Global tracking for {loginEmail.split('@')[0]}</p>
           </div>
           <button className="btn-primary" onClick={() => {
             setSuccessData(null);
@@ -357,15 +423,15 @@ export default function Dashboard() {
             setEditingProduct(null);
             setShowForm(true);
           }}>
-            <Plus size={18} /> New Product Batch
+            <Plus size={18} /> New Batch
           </button>
         </header>
 
         {activeTab === "overview" && (
           <div className="stats-grid">
-            <StatCard icon={<Package />} label="Total Batches" value={products.length.toString()} trend="+2 this month" />
-            <StatCard icon={<ClipboardList />} label="Verified Records" value={products.length.toString()} trend="Synced with Chain" />
-            <StatCard icon={<TrendingUp />} label="Storage Used" value={`${(products.length * 2.4).toFixed(1)}MB`} trend="on IPFS" />
+            <StatCard icon={<Package size={24} />} label="Active Batches" value={products.length.toString()} trend="+2 today" highlight />
+            <StatCard icon={<CheckCircle2 size={24} />} label="Chain Verified" value={products.length.toString()} trend="100% Secure" />
+            <StatCard icon={<ExternalLink size={24} />} label="Public Reach" value={(products.length * 12).toString()} trend="Scans" />
           </div>
         )}
 
@@ -380,30 +446,41 @@ export default function Dashboard() {
               products.map((product) => (
                 <motion.div
                   key={product._id}
-                  initial={{ opacity: 0, y: 10 }}
+                  initial={{ opacity: 0, y: 15 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="product-card glass-panel"
+                  className="product-card glass-panel group"
                 >
                   <div className="product-card-header">
-                    <div className="product-icon">
-                      <Package size={20} />
+                    <div className="product-icon-box">
+                      <Package size={22} className="text-emerald-400" />
                     </div>
-                    <span className="batch-tag">{product.batchId}</span>
+                    <div className="batch-info">
+                      <span className="batch-label">BATCH ID</span>
+                      <span className="batch-id">{product.batchId}</span>
+                    </div>
                   </div>
+
                   <div className="product-card-body">
                     <h3>{product.name}</h3>
-                    <p className="text-muted">{product.origin}</p>
-                    <div className="product-meta">
-                      <span><strong>Harvested:</strong> {new Date(product.harvestDate).toLocaleDateString()}</span>
-                      <span><strong>Tx:</strong> {product.txHash?.slice(0, 10)}...</span>
+                    <div className="meta-info">
+                      <div className="meta-item">
+                        <Calendar size={14} />
+                        <span>{new Date(product.harvestDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                      </div>
+                      <div className="meta-item">
+                        <MapPin size={14} />
+                        <span>{product.origin}</span>
+                      </div>
                     </div>
                   </div>
-                  <div className="product-card-actions">
-                    <Link href={`/verify?batchId=${product.batchId}`} target="_blank" className="btn-secondary btn-sm w-full">
-                      View Verification Page
+
+                  <div className="product-card-footer">
+                    <Link href={`/verify?batchId=${product.batchId}`} target="_blank" className="action-link">
+                      <ExternalLink size={16} />
+                      <span>Public Record</span>
                     </Link>
                     <button
-                      className="btn-primary btn-sm w-full mt-8"
+                      className="btn-update-mini"
                       onClick={() => {
                         setEditingProduct(product);
                         setSuccessData(null);
@@ -411,7 +488,7 @@ export default function Dashboard() {
                         setShowForm(true);
                       }}
                     >
-                      Update History / Docs
+                      Update History
                     </button>
                   </div>
                 </motion.div>
@@ -455,44 +532,56 @@ export default function Dashboard() {
                     </div>
 
                     {wallet?.chainId !== undefined && nodeStatus?.chainId !== undefined && BigInt(wallet.chainId) !== BigInt(nodeStatus.chainId) && (
-                      <div className="network-warning">
-                        ⚠️ <strong>Network Mismatch!</strong><br />
-                        Your wallet is on Chain {wallet.chainId.toString()}. <br />
-                        Please switch MetaMask to <strong>{getActiveNetwork().name}</strong>.
+                      <div className="network-warning" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '15px' }}>
+                        <div>
+                          ⚠️ <strong>Network Mismatch!</strong><br />
+                          Your wallet is on Chain {wallet.chainId.toString()}. <br />
+                          Please switch MetaMask to <strong>{getActiveNetwork().name}</strong>.
+                        </div>
+                        <button
+                          className="btn-secondary"
+                          style={{ padding: '8px 16px', fontSize: '0.9rem', whiteSpace: 'nowrap' }}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            switchNetwork();
+                          }}
+                        >
+                          Switch to {getActiveNetwork().name}
+                        </button>
                       </div>
                     )}
 
-                    <form className="batch-form" onSubmit={handleRegister}>
+                    <form className="batch-form" onSubmit={handleRegister} autoComplete="off">
                       <div className="form-grid">
                         <div className="form-group">
                           <label>Herb / Crop Name</label>
-                          <input name="herbName" required type="text" placeholder="e.g. Organic Ashwagandha" defaultValue={editingProduct?.name} />
+                          <input name="herbName" required type="text" placeholder="e.g. Organic Ashwagandha" defaultValue={editingProduct?.name} autoComplete="off" suppressHydrationWarning />
                         </div>
                         <div className="form-group">
                           <label>Batch ID / Lot Number</label>
-                          <input name="batchId" required type="text" placeholder="BCH-2025-001" defaultValue={editingProduct?.batchId} readOnly={!!editingProduct} style={editingProduct ? { opacity: 0.7, cursor: 'not-allowed' } : {}} />
+                          <input name="batchId" required type="text" placeholder="BCH-2025-001" defaultValue={editingProduct?.batchId} readOnly={!!editingProduct} style={editingProduct ? { opacity: 0.7, cursor: 'not-allowed' } : {}} autoComplete="off" suppressHydrationWarning />
                         </div>
                         <div className="form-group">
                           <label>Harvest Date</label>
-                          <input name="harvestDate" required type="text" placeholder="YYYY-MM-DD" defaultValue={editingProduct?.harvestDate} />
+                          <input name="harvestDate" required type="text" placeholder="YYYY-MM-DD" defaultValue={editingProduct?.harvestDate} autoComplete="off" suppressHydrationWarning />
                         </div>
                         <div className="form-group">
                           <label>Manufacturing Date</label>
-                          <input name="manufactureDate" required type="text" placeholder="YYYY-MM-DD" defaultValue={editingProduct?.manufactureDate} />
+                          <input name="manufactureDate" required type="text" placeholder="YYYY-MM-DD" defaultValue={editingProduct?.manufactureDate} autoComplete="off" suppressHydrationWarning />
                         </div>
                         <div className="form-group">
                           <label>Expiry Date</label>
-                          <input name="expiryDate" required type="text" placeholder="YYYY-MM-DD" defaultValue={editingProduct?.expiryDate} />
+                          <input name="expiryDate" required type="text" placeholder="YYYY-MM-DD" defaultValue={editingProduct?.expiryDate} autoComplete="off" suppressHydrationWarning />
                         </div>
                         <div className="form-group">
                           <label>Origin / Location</label>
-                          <input name="origin" required type="text" placeholder="Rajasthan, India" defaultValue={editingProduct?.origin} />
+                          <input name="origin" required type="text" placeholder="Rajasthan, India" defaultValue={editingProduct?.origin} autoComplete="off" suppressHydrationWarning />
                         </div>
                       </div>
 
                       <div className="form-group">
                         <label>Processing Details / Update Notes</label>
-                        <textarea name="details" rows={2} placeholder="Describe the processing steps or what was updated..." defaultValue={editingProduct?.details}></textarea>
+                        <textarea name="details" rows={2} placeholder="Describe the processing steps or what was updated..." defaultValue={editingProduct?.details} autoComplete="off" suppressHydrationWarning></textarea>
                       </div>
 
                       <div className="form-group">
@@ -518,6 +607,7 @@ export default function Dashboard() {
                             multiple
                             hidden
                             onChange={handleFileChange}
+                            suppressHydrationWarning
                           />
                         </div>
                       </div>
@@ -529,7 +619,7 @@ export default function Dashboard() {
                             <>
                               <Loader2 size={18} className="animate-spin" /> Processing...
                             </>
-                          ) : editingProduct ? "Confirm Update on Blockchain" : "Register & Upload to IPFS"}
+                          ) : editingProduct ? "Confirm Update" : "Register New Batch"}
                         </button>
                       </div>
                     </form>
@@ -684,41 +774,117 @@ export default function Dashboard() {
         }
 
         .product-card {
-          padding: 24px;
-          display: flex;
-          flex-direction: column;
-          gap: 16px;
+          padding: 0;
+          overflow: hidden;
+          background: rgba(12, 20, 37, 0.4);
+          transition: var(--transition-smooth);
+        }
+
+        .product-card:hover {
+          transform: translateY(-8px);
+          background: rgba(12, 20, 37, 0.6);
+          border-color: var(--primary);
         }
 
         .product-card-header {
+          padding: 24px 24px 16px;
           display: flex;
-          justify-content: space-between;
           align-items: center;
+          gap: 16px;
+          border-bottom: 1px solid var(--border-light);
         }
 
-        .product-icon {
-          width: 36px;
-          height: 36px;
+        .product-icon-box {
+          width: 44px;
+          height: 44px;
           background: var(--primary-glow);
-          color: var(--primary);
           display: flex;
           align-items: center;
           justify-content: center;
-          border-radius: 10px;
+          border-radius: 12px;
         }
 
-        .batch-tag {
-          font-family: monospace;
-          background: rgba(255,255,255,0.05);
-          padding: 4px 10px;
-          border-radius: 6px;
-          font-size: 0.8rem;
+        .batch-info {
+          display: flex;
+          flex-direction: column;
+        }
+
+        .batch-label {
+          font-size: 0.65rem;
+          color: var(--text-dim);
+          font-weight: 800;
+          letter-spacing: 0.1em;
+        }
+
+        .batch-id {
+          font-family: 'Outfit', sans-serif;
+          font-weight: 600;
           color: var(--primary);
+          font-size: 0.95rem;
+        }
+
+        .product-card-body {
+          padding: 20px 24px;
         }
 
         .product-card-body h3 {
-          margin-bottom: 4px;
-          font-size: 1.1rem;
+          margin-bottom: 12px;
+          font-size: 1.25rem;
+          color: var(--text-main);
+        }
+
+        .meta-info {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+
+        .meta-item {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          color: var(--text-muted);
+          font-size: 0.85rem;
+        }
+
+        .product-card-footer {
+          padding: 16px 24px 24px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          background: rgba(255, 255, 255, 0.02);
+        }
+
+        .action-link {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          color: var(--text-muted);
+          font-size: 0.85rem;
+          font-weight: 600;
+          transition: color 0.2s;
+        }
+
+        .action-link:hover {
+          color: var(--primary);
+        }
+
+        .btn-update-mini {
+          background: transparent;
+          border: 1px solid var(--border-light);
+          color: var(--text-main);
+          padding: 6px 12px;
+          border-radius: 8px;
+          font-size: 0.8rem;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+
+        .btn-update-mini:hover {
+          background: var(--primary);
+          border-color: var(--primary);
+          box-shadow: 0 0 15px var(--primary-glow);
         }
 
         .product-meta {
@@ -758,10 +924,12 @@ export default function Dashboard() {
         .modal-content {
           width: 100%;
           max-width: 800px;
-          padding: 40px;
+          padding: 30px;
           position: relative;
-          max-height: 90vh;
+          max-height: 85vh;
           overflow-y: auto;
+          display: flex;
+          flex-direction: column;
         }
 
         .modal-header {
@@ -852,7 +1020,9 @@ export default function Dashboard() {
           display: flex;
           justify-content: flex-end;
           gap: 16px;
-          margin-top: 20px;
+          margin-top: 32px;
+          padding-top: 24px;
+          border-top: 1px solid var(--border-light);
         }
 
         .qr-container {

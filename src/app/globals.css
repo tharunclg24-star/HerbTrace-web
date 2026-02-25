@@ -3,24 +3,28 @@
 :root {
   --primary: #10b981;
   --primary-hover: #059669;
-  --primary-glow: rgba(16, 185, 129, 0.2);
+  --primary-glow: rgba(16, 185, 129, 0.25);
 
-  --bg-dark: #020617;
-  --bg-card: #0f172a;
-  --bg-surface: #1e293b;
+  --bg-dark: #050b1a;
+  /* Darker, slightly blue-tinted midnight */
+  --bg-card: #0c1425;
+  --bg-surface: #111a2e;
 
   --text-main: #f8fafc;
   --text-muted: #94a3b8;
   --text-dim: #64748b;
 
-  --border-light: rgba(255, 255, 255, 0.1);
-  --border-glow: rgba(16, 185, 129, 0.3);
+  --border-light: rgba(255, 255, 255, 0.08);
+  --border-glow: rgba(16, 185, 129, 0.4);
 
-  --glass: rgba(15, 23, 42, 0.8);
+  --glass: rgba(12, 20, 37, 0.75);
   --glass-border: rgba(255, 255, 255, 0.1);
+  --glass-highlight: rgba(255, 255, 255, 0.03);
 
-  --transition-fast: 0.2s ease;
-  --transition-smooth: 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-fast: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-smooth: 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+
+  --emerald-gradient: linear-gradient(135deg, #10b981 0%, #059669 100%);
 }
 
 * {
@@ -76,25 +80,38 @@ a {
 /* Glassmorphism Classes */
 .glass-panel {
   background: var(--glass);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   border: 1px solid var(--glass-border);
-  border-radius: 24px;
+  border-radius: 28px;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+  position: relative;
+  overflow: hidden;
+}
+
+.glass-panel::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
 }
 
 .glass-card {
-  background: rgba(255, 255, 255, 0.03);
-  backdrop-filter: blur(8px);
+  background: var(--glass-highlight);
+  backdrop-filter: blur(12px);
   border: 1px solid var(--border-light);
   border-radius: 20px;
   transition: var(--transition-smooth);
 }
 
 .glass-card:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.06);
   border-color: var(--border-glow);
-  transform: translateY(-4px);
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4), 0 0 20px var(--primary-glow);
+  transform: translateY(-6px);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 15px rgba(16, 185, 129, 0.15);
 }
 
 /* Animations */

@@ -10,6 +10,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@openzeppelin/contracts-upgradeable": "^5.4.0",
     "axios": "^1.13.2",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
@@ -26,6 +27,7 @@
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "@openzeppelin/hardhat-upgrades": "^3.9.1",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",

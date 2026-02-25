@@ -4,19 +4,42 @@ This guide describes how to deploy HerbTrace to the **Sepolia Testnet** using Re
 
 ---
 
-## 🚀 Deployment to Polygon Amoy
+## 🚀 Deployment Guide (CLI Method)
 
-1.  **Fund your wallet**: Go to [Amoy Faucet](https://faucet.polygon.technology/) and get some test POL for `0x3Af...0B7e`.
-2.  **Clean Config**: I have reset your `.env.local`. Open it and:
-    *   Paste your **PRIVATE_KEY** (from MetaMask -> Account Details).
-3.  **Run Deploy Command**:
+Since browser connections can be flaky, the most reliable way to deploy is using the command line.
+
+### 1. Prerequisites
+Ensure your `.env.local` has your **PRIVATE_KEY** set.
+
+### 2. Deploy
+Run **ONE** of the following commands in your terminal:
+
+**For Polygon Amoy (Recommended):**
+```bash
+npx hardhat run scripts/deploy.js --network amoy
+```
+
+**For Sepolia:**
+```bash
+npx hardhat run scripts/deploy.js --network sepolia
+```
+
+**For Local Hardhat:**
+```bash
+npx hardhat run scripts/deploy.js --network localhost
+```
+
+### 3. Done!
+The script will **automatically**:
+1.  Deploy your contract.
+2.  Update `.env.local` with the new address and network name.
+3.  You just need to **restart your app**:
     ```bash
-    npx hardhat run scripts/deploy.js --network amoy
+    npm run dev
     ```
-4.  **Important**: Copy the "HerbTrace contract deployed to: 0x..." address.
-5.  **Update `.env.local`**:
-    *   Set `NEXT_PUBLIC_CONTRACT_ADDRESS=0x_YOUR_NEW_ADDRESS_HERE`
-6.  **Restart**: Run `npm run dev` and refresh your browser.
+
+> **✅ Verification**: Check your terminal output. It should say:  
+> `✅ Updated .env.local` with the new address.
 
 ---
 
@@ -35,6 +58,17 @@ To store your herb documents (PDFs/Images) on the real decentralized web:
     - **Do NOT copy the API Key or Secret.**
     - **DO copy the "JWT"** (the very long string at the bottom).
 4.  **Update `.env.local`**: Paste that long string into the `PINATA_JWT=` field.
+
+## 🗄️ Database Setup (MongoDB)
+
+HerbTrace uses MongoDB for persistent storage of product records and history.
+
+1.  **Set Up Atlas**: Follow the [MongoDB Setup Guide](file:///C:/Users/tharun%20prakash/.gemini/antigravity/brain/baf0e218-a2a6-41f7-a109-fb051924fa03/MONGODB_SETUP.md) to create a free cluster.
+2.  **Add URI**: Open `.env.local` and add your connection string to `MONGODB_URI`.
+3.  **Test Connection**:
+    ```bash
+    node scripts/test-mongodb.js
+    ```
 
 ---
 

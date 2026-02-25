@@ -1,4 +1,5 @@
 import "@nomicfoundation/hardhat-toolbox";
+import "@openzeppelin/hardhat-upgrades";
 import * as dotenv from "dotenv";
 import { resolve } from "path";
 
@@ -6,7 +7,7 @@ import { resolve } from "path";
 dotenv.config({ path: resolve(process.cwd(), ".env.local") });
 
 const PRIVATE_KEY = process.env.PRIVATE_KEY || "";
-const AMOY_RPC_URL = process.env.AMOY_RPC_URL || "https://rpc-amoy.polygon.technology";
+const AMOY_RPC_URL = process.env.NEXT_PUBLIC_AMOY_RPC_URL || process.env.AMOY_RPC_URL || "https://rpc.ankr.com/polygon_amoy";
 
 /** @type import('hardhat/config').HardhatUserConfig */
 export default {

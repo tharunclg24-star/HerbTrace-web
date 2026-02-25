@@ -3,25 +3,28 @@ import fs from "fs";
 import path from "path";
 
 async function main() {
-    console.log("Compiling & Deploying...");
+    console.log("Deploying Proxy...");
 
-    // This triggers compilation automatically
     const [deployer] = await hre.ethers.getSigners();
     console.log("Deploying with account:", deployer.address);
 
     const HerbTrace = await hre.ethers.getContractFactory("HerbTrace");
-    const herbTrace = await HerbTrace.deploy();
+
+    // Deploy proxy with 'initialize' function
+    const herbTrace = await hre.upgrades.deployProxy(HerbTrace, [], { initializer: 'initialize' });
 
     await herbTrace.waitForDeployment();
+
+    // In ethers v6, target is the address
     const address = herbTrace.target;
 
-    console.log(`HerbTrace contract deployed to ${address}`);
+    console.log(`HerbTrace (Proxy) deployed to ${address}`);
 
     // Update .env.local
     const envPath = path.resolve(process.cwd(), ".env.local");
     const addressKey = "NEXT_PUBLIC_CONTRACT_ADDRESS";
     const networkKey = "NEXT_PUBLIC_NETWORK";
-    const networkName = hre.network.name; // 'amoy', 'sepolia', 'hardhat', 'localhost'
+    const networkName = hre.network.name;
 
     let content = "";
     if (fs.existsSync(envPath)) {
@@ -29,8 +32,6 @@ async function main() {
     }
 
     const lines = content.split(/\r?\n/);
-
-    // updates map
     const updates = {
         [addressKey]: address,
         [networkKey]: networkName
@@ -40,27 +41,23 @@ async function main() {
         const trimmed = line.trim();
         for (const [key, value] of Object.entries(updates)) {
             if (trimmed.startsWith(`${key}=`)) {
-                delete updates[key]; // mark as found
+                delete updates[key];
                 return `${key}=${value}`;
             }
         }
         return line;
     });
 
-    // Append missing keys
     for (const [key, value] of Object.entries(updates)) {
         newLines.push(`${key}=${value}`);
     }
 
-    // Filter out empty lines at the end to keep it clean
-    if (newLines[newLines.length - 1] === "") {
+    if (newLines.length > 0 && newLines[newLines.length - 1] === "") {
         newLines.pop();
     }
 
     fs.writeFileSync(envPath, newLines.join("\n"));
-    console.log(`✅ Updated .env.local:`);
-    console.log(`   - ${networkKey}=${networkName}`);
-    console.log(`   - ${addressKey}=${address}`);
+    console.log(`✅ Updated .env.local with Proxy Address`);
 }
 
 main().catch((error) => {

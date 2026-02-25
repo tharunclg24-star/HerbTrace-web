@@ -2,7 +2,8 @@ import fs from 'fs';
 import path from 'path';
 
 const envPath = path.resolve(process.cwd(), '.env.local');
-const newAddress = '0x5FbDB2315678afecb367f032d93F642f64180aa3';
+// The user provided contract address from Remix
+const newAddress = '0x59b670e9fA9D0A427751Af201D676719a970857b';
 const key = 'NEXT_PUBLIC_CONTRACT_ADDRESS';
 
 try {
