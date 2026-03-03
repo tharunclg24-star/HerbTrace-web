@@ -39,3 +39,33 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Hardhat / Smart Contracts
+/artifacts/
+/cache/
+/typechain/
+/typechain-types/
+/coverage.json
+/coverage/
+
+# Local Logs & Temp Files
+*_output.txt
+*_result.txt
+*.log
+*_temp.txt
+error_trace.txt
+accounts_temp.txt
+help.txt
+node_full.txt
+deploy_output.txt
+deploy_result.txt
+deploy_result_utf8.txt
+env_temp.txt
+node_output.txt
+node_full.txt
+DATA_CLEARED.md
+DEPLOYMENT_FIXED.md
+MOCK_MODE_EXPLAINED.md
+PROXY_DEPLOYMENT.md
+QUICK_REFERENCE.md
+VERCEL_DEPLOYMENT_GUIDE.md
