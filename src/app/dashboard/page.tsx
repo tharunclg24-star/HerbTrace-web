@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Plus, LayoutDashboard, FileText, Settings, LogOut, Package, ClipboardList, TrendingUp, Upload, CheckCircle2, QrCode as QrIcon, Download, Loader2, Mail, Link2, Link2Off, ExternalLink, Calendar, MapPin } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { QRCodeSVG } from "qrcode.react";
+import { QRCodeCanvas } from "qrcode.react";
 import { uploadToIPFS } from "@/lib/ipfs";
 import { registerBatchOnChain, updateBatchOnChain, connectWallet, verifyNetwork } from "@/lib/web3";
 import { getActiveNetwork, getContractAddress } from "@/config/network.config";
@@ -248,6 +248,21 @@ export default function Dashboard() {
     } finally {
       setIsRegistering(false);
     }
+  };
+
+  const downloadQRCode = () => {
+    const canvas = document.getElementById("qr-code-canvas") as HTMLCanvasElement;
+    if (!canvas) return;
+
+    const pngUrl = canvas
+      .toDataURL("image/png")
+      .replace("image/png", "image/octet-stream");
+    let downloadLink = document.createElement("a");
+    downloadLink.href = pngUrl;
+    downloadLink.download = `herbtrace-qr-${successData?.batchId || 'batch'}.png`;
+    document.body.appendChild(downloadLink);
+    downloadLink.click();
+    document.body.removeChild(downloadLink);
   };
 
   if (!isLoggedIn) {
@@ -633,23 +648,24 @@ export default function Dashboard() {
                     <p className="text-muted">Stored on MongoDB and pinned to Pinata IPFS.</p>
 
                     <div className="qr-container glass-card">
-                      <QRCodeSVG
-                        id="qr-code-canvas"
-                        value={successData.verifyUrl}
-                        size={200}
-                        level="H"
-                        includeMargin={true}
-                      />
+                      <div className="qr-wrapper">
+                        <QRCodeCanvas
+                          id="qr-code-canvas"
+                          value={successData.verifyUrl}
+                          size={256}
+                          level="Q" // Quartile level: balance between complexity and scanning reliability
+                          includeMargin={true}
+                          marginSize={2}
+                        />
+                      </div>
                       <div className="qr-actions">
                         <p className="batch-id-text">Batch: {successData.batchId}</p>
                         <div className="btn-group">
                           <a href={successData.verifyUrl} target="_blank" className="btn-secondary btn-sm">
                             View Public Page
                           </a>
-                          <button type="button" className="btn-primary btn-sm" onClick={() => {
-                            alert("QR Code ready for print!");
-                          }}>
-                            <Download size={14} /> Download QR
+                          <button type="button" className="btn-primary btn-sm" onClick={downloadQRCode}>
+                            <Download size={14} /> Download PNG
                           </button>
                         </div>
                       </div>
@@ -1032,6 +1048,19 @@ export default function Dashboard() {
           align-items: center;
           padding: 32px;
           max-width: 400px;
+          background: rgba(255, 255, 255, 0.03);
+          border-radius: 24px;
+          border: 1px solid var(--border-light);
+        }
+
+        .qr-wrapper {
+          background: white;
+          padding: 16px;
+          border-radius: 12px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          box-shadow: 0 10px 30px rgba(0,0,0,0.3);
         }
 
         .qr-actions {
