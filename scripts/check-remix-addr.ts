@@ -16,8 +16,8 @@ async function checkCode() {
             console.log("RESULT: CODE_FOUND");
             console.log(`✅ Contract exists! Code length: ${code.length} bytes.`);
         }
-    } catch (error) {
-        console.error("Error connecting to node:", error.message);
+    } catch (error: any) {
+        console.error("Error connecting to node:", error.message || error);
     }
 }
 
